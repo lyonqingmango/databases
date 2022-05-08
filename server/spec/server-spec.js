@@ -58,11 +58,10 @@ describe('Persistent Node Chat Server', function() {
 
         dbConnection.query(queryString, queryArgs, function(err, results) {
           // Should have one result:
-          console.log('this is dbConnection query results', results);
           expect(results.length).to.equal(1);
 
           // TODO: If you don't have a column named text, change this test.
-          expect(results[0].text).to.equal('In mercy\'s name, three days is all I need.'); // change to text_message
+          expect(results[0].text).to.equal('In mercy\'s name, three days is all I need.');
 
           done();
         });
@@ -104,8 +103,7 @@ describe('Persistent Node Chat Server', function() {
           if (err) { throw err; }
           request('http://127.0.0.1:3000/classes/messages', function(error, response, body) {
             var messageLog = JSON.parse(body);
-            console.log('messageLog' + messageLog);
-            expect(messageLog[0].text).to.equal('Men like you can never change!'); // change to text_message
+            expect(messageLog[0].text).to.equal('Men like you can never change!');
             expect(messageLog[0].roomname).to.equal('main');
             done();
           });
@@ -113,14 +111,66 @@ describe('Persistent Node Chat Server', function() {
       });
     });
   });
-});
-// dbConnection.query(queryString, queryArgs, function(err) {
-//   if (err) { throw err; }
 
-//   // Now query the Node chat server and see if it returns
-//   // the message we just inserted:
-//   request('http://127.0.0.1:3000/classes/messages', function(error, response, body) {
-//     var messageLog = JSON.parse(body);
-//     expect(messageLog[0].text_message).to.equal('Men like you can never change!'); // change to text_message
-//     expect(messageLog[0].roomname).to.equal('main');
-//     done();
+  it('should automatically add new user when recieving post message request', function(done) {
+    request({
+      method: 'POST',
+      uri: 'http://127.0.0.1:3000/classes/messages',
+      json: {
+        username: 'bob',
+        text: 'posting without first adding bob username',
+        roomname: 'main'
+      }
+    }, function () {
+      var queryString = 'SELECT * FROM users';
+      var queryArgs = [];
+
+      dbConnection.query(queryString, queryArgs, function(err, results) {
+        // Should have one result:
+        expect(results.length).to.equal(1);
+        expect(results[0].username).to.equal('bob');
+        done();
+      });
+    });
+  });
+
+  it('should handle multiple post requests with multiple users/rooms', function(done) {
+    request({
+      method: 'POST',
+      uri: 'http://127.0.0.1:3000/classes/messages',
+      json: {
+        username: 'bob',
+        text: 'this is first message',
+        roomname: 'main'
+      }
+    }, function () {
+      request({
+        method: 'POST',
+        uri: 'http://127.0.0.1:3000/classes/messages',
+        json: {
+          username: 'steve',
+          text: 'this is second message',
+          roomname: 'secondroom'
+        }
+      }, function () {
+        var queryString = 'SELECT * FROM users';
+        var queryArgs = [];
+        dbConnection.query(queryString, queryArgs, function(err, results) {
+          // Should have one result:
+          expect(results.length).to.equal(2);
+          expect(results[0].username).to.equal('bob');
+          expect(results[1].username).to.equal('steve');
+        });
+
+        var queryString2 = 'Select * FROM messages';
+        dbConnection.query(queryString2, queryArgs, function(err, results) {
+          // Should have one result:
+          expect(results.length).to.equal(2);
+          expect(results[0].text).to.equal('this is first message');
+          expect(results[1].text).to.equal('this is second message');
+          done();
+        });
+      });
+    });
+  });
+});
